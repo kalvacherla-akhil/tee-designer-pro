@@ -1,8 +1,3 @@
-import { create } from "zustand";
-
-// We'll use a simple zustand-like store with React context instead
-// since zustand isn't installed. Using a simple React context store.
-
 import { createContext, useContext, useState, ReactNode } from "react";
 
 export interface CartItem {

@@ -3,9 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { products } from "@/data/products";
-
-const types = ["All", "Round Neck", "Oversized", "Polo"];
+import { products, categories } from "@/data/products";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -13,9 +11,9 @@ const fadeUp = {
 };
 
 const Products = () => {
-  const [typeFilter, setTypeFilter] = useState("All");
+  const [catFilter, setCatFilter] = useState("All");
 
-  const filtered = typeFilter === "All" ? products : products.filter((p) => p.type === typeFilter);
+  const filtered = catFilter === "All" ? products : products.filter((p) => p.category === catFilter);
 
   return (
     <div className="min-h-screen bg-background">
@@ -32,12 +30,12 @@ const Products = () => {
 
         {/* Filters */}
         <div className="flex justify-center gap-2 mb-12 flex-wrap">
-          {types.map((t) => (
+          {categories.map((t) => (
             <button
               key={t}
-              onClick={() => setTypeFilter(t)}
+              onClick={() => setCatFilter(t)}
               className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                typeFilter === t
+                catFilter === t
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary text-secondary-foreground hover:bg-muted"
               }`}
@@ -77,13 +75,15 @@ const ProductCard = ({ product, index }: { product: typeof products[0]; index: n
               src={product.colors[colorIdx].image}
               alt={product.name}
               className="w-3/4 object-contain transition-transform duration-500 group-hover:scale-110"
+              loading="lazy"
             />
           </div>
           <div className="p-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <h3 className="font-display font-bold text-lg text-foreground">{product.name}</h3>
-              <span className="font-display font-bold text-lg text-foreground">${product.price}</span>
+              <span className="font-display font-bold text-lg text-foreground">₹{product.price}</span>
             </div>
+            <p className="text-xs text-accent font-medium mb-1">{product.category}</p>
             <p className="text-sm text-muted-foreground mb-3">{product.type} • {product.sizes.join(", ")}</p>
             <div className="flex gap-2" onClick={(e) => e.preventDefault()}>
               {product.colors.map((c, ci) => (

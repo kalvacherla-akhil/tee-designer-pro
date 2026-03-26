@@ -156,7 +156,7 @@ const Index = () => {
                     <h3 className="font-display font-bold text-foreground">{product.name}</h3>
                     <p className="text-sm text-muted-foreground">{product.type}</p>
                     <div className="flex items-center justify-between mt-3">
-                      <span className="font-display font-bold text-lg text-foreground">${product.price}</span>
+                      <span className="font-display font-bold text-lg text-foreground">₹{product.price}</span>
                       <div className="flex gap-1">
                         {product.colors.map((c) => (
                           <span

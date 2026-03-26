@@ -4,9 +4,28 @@ import { Minus, Plus, Trash2, ArrowLeft, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import { useCart } from "@/store/cartStore";
+import { toast } from "sonner";
 
 const Cart = () => {
   const { items, updateQuantity, removeItem, total } = useCart();
+
+  const handleWhatsAppCheckout = () => {
+    if (items.length === 0) return;
+
+    let message = "🛒 *ThreadStudio Order*\n\n";
+    items.forEach((item, i) => {
+      message += `${i + 1}. *${item.name}*\n`;
+      message += `   Color: ${item.color} | Size: ${item.size}\n`;
+      message += `   Qty: ${item.quantity} × ₹${item.price} = ₹${(item.price * item.quantity).toFixed(2)}\n\n`;
+    });
+    message += `──────────────\n`;
+    message += `*Total: ₹${total.toFixed(2)}*\n\n`;
+    message += `Please confirm my order! 🙏`;
+
+    const encoded = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encoded}`, "_blank");
+    toast.success("Opening WhatsApp...");
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -79,7 +98,7 @@ const Cart = () => {
                     animate={{ scale: 1 }}
                     className="font-display font-bold text-lg w-20 text-right text-foreground"
                   >
-                    ${(item.price * item.quantity).toFixed(2)}
+                    ₹{(item.price * item.quantity).toFixed(2)}
                   </motion.span>
                   <button
                     onClick={() => removeItem(item.id)}
@@ -100,7 +119,7 @@ const Cart = () => {
                   animate={{ scale: 1 }}
                   className="font-display font-black text-3xl text-foreground"
                 >
-                  ${total.toFixed(2)}
+                  ₹{total.toFixed(2)}
                 </motion.span>
               </div>
               <div className="flex gap-4">
@@ -109,8 +128,8 @@ const Cart = () => {
                     <ArrowLeft className="w-4 h-4 mr-2" /> Continue Shopping
                   </Button>
                 </Link>
-                <Button variant="hero" size="lg" className="flex-1" onClick={() => {}}>
-                  Checkout
+                <Button variant="hero" size="lg" className="flex-1 bg-[#25D366] hover:bg-[#1da851]" onClick={handleWhatsAppCheckout}>
+                  Checkout via WhatsApp
                 </Button>
               </div>
             </div>

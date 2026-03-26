@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { fabric } from "fabric";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Type, Upload, Undo2, Redo2, ZoomIn, ZoomOut, Download, Trash2, ShoppingCart,
-  RotateCcw, Square, Circle, Triangle,
+  RotateCcw, Square, Circle, Triangle, FlipHorizontal2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
@@ -15,9 +15,13 @@ import { toast } from "sonner";
 const CANVAS_WIDTH = 500;
 const CANVAS_HEIGHT = 600;
 
+type Side = "front" | "back";
+
 const Studio = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fabricRef = useRef<fabric.Canvas | null>(null);
+  const frontCanvasRef = useRef<HTMLCanvasElement>(null);
+  const backCanvasRef = useRef<HTMLCanvasElement>(null);
+  const frontFabricRef = useRef<fabric.Canvas | null>(null);
+  const backFabricRef = useRef<fabric.Canvas | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -26,62 +30,71 @@ const Studio = () => {
   const productId = searchParams.get("product") || products[0].id;
   const product = products.find((p) => p.id === productId) || products[0];
 
+  const [activeSide, setActiveSide] = useState<Side>("front");
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
   const [selectedSize, setSelectedSize] = useState(product.sizes[2] || product.sizes[0]);
-  const [history, setHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [frontHistory, setFrontHistory] = useState<string[]>([]);
+  const [frontHistoryIdx, setFrontHistoryIdx] = useState(-1);
+  const [backHistory, setBackHistory] = useState<string[]>([]);
+  const [backHistoryIdx, setBackHistoryIdx] = useState(-1);
   const [zoom, setZoom] = useState(1);
 
-  const saveHistory = useCallback(() => {
-    if (!fabricRef.current) return;
-    const json = JSON.stringify(fabricRef.current.toJSON());
-    setHistory((prev) => {
-      const newHistory = prev.slice(0, historyIndex + 1);
-      newHistory.push(json);
-      return newHistory;
-    });
-    setHistoryIndex((prev) => prev + 1);
-  }, [historyIndex]);
+  const getActiveCanvas = () => activeSide === "front" ? frontFabricRef.current : backFabricRef.current;
+  const getHistory = () => activeSide === "front" ? { history: frontHistory, index: frontHistoryIdx, setHistory: setFrontHistory, setIndex: setFrontHistoryIdx } : { history: backHistory, index: backHistoryIdx, setHistory: setBackHistory, setIndex: setBackHistoryIdx };
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const canvas = new fabric.Canvas(canvasRef.current, {
+  const saveHistory = useCallback(() => {
+    const canvas = getActiveCanvas();
+    if (!canvas) return;
+    const json = JSON.stringify(canvas.toJSON());
+    const h = getHistory();
+    h.setHistory((prev) => {
+      const newH = prev.slice(0, h.index + 1);
+      newH.push(json);
+      return newH;
+    });
+    h.setIndex((prev) => prev + 1);
+  }, [activeSide, frontHistoryIdx, backHistoryIdx]);
+
+  const initCanvas = (ref: React.RefObject<HTMLCanvasElement>, fabricRef: React.MutableRefObject<fabric.Canvas | null>) => {
+    if (!ref.current || fabricRef.current) return;
+    const canvas = new fabric.Canvas(ref.current, {
       width: CANVAS_WIDTH,
       height: CANVAS_HEIGHT,
       backgroundColor: "transparent",
       selection: true,
     });
     fabricRef.current = canvas;
-
     canvas.on("object:modified", saveHistory);
     canvas.on("object:added", saveHistory);
+  };
 
+  useEffect(() => {
+    initCanvas(frontCanvasRef, frontFabricRef);
+    initCanvas(backCanvasRef, backFabricRef);
     return () => {
-      canvas.dispose();
+      frontFabricRef.current?.dispose();
+      backFabricRef.current?.dispose();
     };
   }, []);
 
   const addText = () => {
+    const canvas = getActiveCanvas();
     const text = new fabric.IText("Your Text", {
-      left: 150,
-      top: 250,
-      fontSize: 32,
-      fontFamily: "Archivo",
-      fill: "#000000",
-      fontWeight: "bold",
+      left: 150, top: 250, fontSize: 32, fontFamily: "Archivo", fill: "#000000", fontWeight: "bold",
     });
-    fabricRef.current?.add(text);
-    fabricRef.current?.setActiveObject(text);
+    canvas?.add(text);
+    canvas?.setActiveObject(text);
   };
 
   const addShape = (type: "rect" | "circle" | "triangle") => {
+    const canvas = getActiveCanvas();
     let shape: fabric.Object;
     const opts = { left: 180, top: 220, fill: "#3B82F6", opacity: 0.8 };
     if (type === "rect") shape = new fabric.Rect({ ...opts, width: 100, height: 100 });
     else if (type === "circle") shape = new fabric.Circle({ ...opts, radius: 50 });
     else shape = new fabric.Triangle({ ...opts, width: 100, height: 100 });
-    fabricRef.current?.add(shape);
-    fabricRef.current?.setActiveObject(shape);
+    canvas?.add(shape);
+    canvas?.setActiveObject(shape);
   };
 
   const uploadImage = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,8 +105,9 @@ const Studio = () => {
       fabric.Image.fromURL(event.target?.result as string, (img) => {
         img.scaleToWidth(200);
         img.set({ left: 150, top: 200 });
-        fabricRef.current?.add(img);
-        fabricRef.current?.setActiveObject(img);
+        const canvas = getActiveCanvas();
+        canvas?.add(img);
+        canvas?.setActiveObject(img);
       });
     };
     reader.readAsDataURL(file);
@@ -101,27 +115,32 @@ const Studio = () => {
   };
 
   const undo = () => {
-    if (historyIndex <= 0) return;
-    const newIndex = historyIndex - 1;
-    fabricRef.current?.loadFromJSON(JSON.parse(history[newIndex]), () => {
-      fabricRef.current?.renderAll();
-      setHistoryIndex(newIndex);
+    const canvas = getActiveCanvas();
+    const h = getHistory();
+    if (h.index <= 0) return;
+    const newIndex = h.index - 1;
+    canvas?.loadFromJSON(JSON.parse(h.history[newIndex]), () => {
+      canvas?.renderAll();
+      h.setIndex(newIndex);
     });
   };
 
   const redo = () => {
-    if (historyIndex >= history.length - 1) return;
-    const newIndex = historyIndex + 1;
-    fabricRef.current?.loadFromJSON(JSON.parse(history[newIndex]), () => {
-      fabricRef.current?.renderAll();
-      setHistoryIndex(newIndex);
+    const canvas = getActiveCanvas();
+    const h = getHistory();
+    if (h.index >= h.history.length - 1) return;
+    const newIndex = h.index + 1;
+    canvas?.loadFromJSON(JSON.parse(h.history[newIndex]), () => {
+      canvas?.renderAll();
+      h.setIndex(newIndex);
     });
   };
 
   const deleteSelected = () => {
-    const active = fabricRef.current?.getActiveObject();
+    const canvas = getActiveCanvas();
+    const active = canvas?.getActiveObject();
     if (active) {
-      fabricRef.current?.remove(active);
+      canvas?.remove(active);
       saveHistory();
     }
   };
@@ -129,27 +148,30 @@ const Studio = () => {
   const handleZoom = (dir: "in" | "out") => {
     const newZoom = dir === "in" ? Math.min(zoom + 0.1, 2) : Math.max(zoom - 0.1, 0.5);
     setZoom(newZoom);
-    fabricRef.current?.setZoom(newZoom);
+    getActiveCanvas()?.setZoom(newZoom);
   };
 
   const downloadDesign = () => {
-    if (!fabricRef.current) return;
-    const dataURL = fabricRef.current.toDataURL({ format: "png", multiplier: 2 });
+    const canvas = getActiveCanvas();
+    if (!canvas) return;
+    const dataURL = canvas.toDataURL({ format: "png", multiplier: 2 });
     const link = document.createElement("a");
     link.href = dataURL;
-    link.download = "my-design.png";
+    link.download = `my-design-${activeSide}.png`;
     link.click();
   };
 
   const clearCanvas = () => {
-    fabricRef.current?.clear();
-    fabricRef.current?.setBackgroundColor("transparent", () => {});
-    fabricRef.current?.renderAll();
+    const canvas = getActiveCanvas();
+    canvas?.clear();
+    canvas?.setBackgroundColor("transparent", () => {});
+    canvas?.renderAll();
     saveHistory();
   };
 
   const addToCart = () => {
-    const designImage = fabricRef.current?.toDataURL({ format: "png", multiplier: 1 });
+    const frontImage = frontFabricRef.current?.toDataURL({ format: "png", multiplier: 1 });
+    const backImage = backFabricRef.current?.toDataURL({ format: "png", multiplier: 1 });
     addItem({
       id: `${product.id}-${selectedColorIdx}-${selectedSize}-${Date.now()}`,
       name: product.name,
@@ -157,7 +179,8 @@ const Studio = () => {
       size: selectedSize,
       price: product.price,
       quantity: 1,
-      designImage,
+      designImage: frontImage,
+      backDesignImage: backImage,
     });
     toast.success("Added to cart!");
   };
@@ -214,29 +237,61 @@ const Studio = () => {
 
           {/* Canvas Area */}
           <motion.div
-            className="flex-1 flex justify-center"
+            className="flex-1 flex flex-col items-center"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3 }}
           >
+            {/* Front/Back Toggle */}
+            <div className="flex gap-2 mb-4">
+              {(["front", "back"] as Side[]).map((side) => (
+                <button
+                  key={side}
+                  onClick={() => setActiveSide(side)}
+                  className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                    activeSide === side
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground hover:bg-muted"
+                  }`}
+                >
+                  {side === "back" && <FlipHorizontal2 className="w-3.5 h-3.5" />}
+                  {side.charAt(0).toUpperCase() + side.slice(1)} Side
+                </button>
+              ))}
+            </div>
+
             <div className="relative">
               {/* T-shirt background image */}
               <img
                 src={product.colors[selectedColorIdx].image}
                 alt={product.name}
-                className="w-[500px] h-[600px] object-contain pointer-events-none select-none"
+                className={`w-[500px] h-[600px] object-contain pointer-events-none select-none transition-transform duration-500 ${activeSide === "back" ? "scale-x-[-1]" : ""}`}
               />
               {/* Canvas overlay */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="mt-[-20px]" style={{ width: 220, height: 260 }}>
+                  {/* Front canvas */}
                   <canvas
-                    ref={canvasRef}
+                    ref={frontCanvasRef}
                     className="border border-dashed border-accent/30 rounded-lg"
                     style={{
                       width: 220,
                       height: 260,
                       transform: `scale(${zoom})`,
                       transformOrigin: "center center",
+                      display: activeSide === "front" ? "block" : "none",
+                    }}
+                  />
+                  {/* Back canvas */}
+                  <canvas
+                    ref={backCanvasRef}
+                    className="border border-dashed border-accent/30 rounded-lg"
+                    style={{
+                      width: 220,
+                      height: 260,
+                      transform: `scale(${zoom})`,
+                      transformOrigin: "center center",
+                      display: activeSide === "back" ? "block" : "none",
                     }}
                   />
                 </div>
@@ -254,7 +309,7 @@ const Studio = () => {
             <div>
               <h3 className="font-display font-bold text-sm uppercase tracking-wider text-muted-foreground mb-3">Product</h3>
               <p className="font-display font-bold text-foreground">{product.name}</p>
-              <p className="text-2xl font-display font-black text-foreground mt-1">${product.price}</p>
+              <p className="text-2xl font-display font-black text-foreground mt-1">₹{product.price}</p>
             </div>
 
             <div>

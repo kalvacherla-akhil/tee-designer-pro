@@ -23,7 +23,9 @@ const Cart = () => {
     message += `Please confirm my order! 🙏`;
 
     const encoded = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encoded}`, "_blank");
+    // Replace with your actual WhatsApp number (include country code without +)
+    const yourPhoneNumber = "916309725902"; // Example: 91 for India + your number
+    window.open(`https://wa.me/${yourPhoneNumber}?text=${encoded}`, "_blank");
     toast.success("Opening WhatsApp...");
   };
 

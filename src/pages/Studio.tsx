@@ -11,9 +11,14 @@ import Navbar from "@/components/Navbar";
 import { products } from "@/data/products";
 import { useCart } from "@/store/cartStore";
 import { toast } from "sonner";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-const CANVAS_WIDTH = 500;
-const CANVAS_HEIGHT = 600;
+gsap.registerPlugin(ScrollTrigger);
+
+const CANVAS_WIDTH = 310;
+const CANVAS_HEIGHT = 500;
+  
 
 type Side = "front" | "back";
 
@@ -23,6 +28,7 @@ const Studio = () => {
   const frontFabricRef = useRef<fabric.Canvas | null>(null);
   const backFabricRef = useRef<fabric.Canvas | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const studioRef = useRef<HTMLDivElement>(null);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { addItem } = useCart();
@@ -71,6 +77,30 @@ const Studio = () => {
   useEffect(() => {
     initCanvas(frontCanvasRef, frontFabricRef);
     initCanvas(backCanvasRef, backFabricRef);
+    
+    // GSAP animations for Studio
+    if (studioRef.current) {
+      gsap.fromTo(studioRef.current.querySelector(".studio-title"), 
+        { opacity: 0, y: 80 },
+        { opacity: 1, y: 0, duration: 1, ease: "power3.out" }
+      );
+      
+      gsap.fromTo(studioRef.current.querySelector(".toolbar"), 
+        { opacity: 0, x: -60 },
+        { opacity: 1, x: 0, duration: 0.8, delay: 0.3, ease: "power3.out" }
+      );
+      
+      gsap.fromTo(studioRef.current.querySelector(".canvas-area"), 
+        { opacity: 0, scale: 0.9, y: 60 },
+        { opacity: 1, scale: 1, y: 0, duration: 1, delay: 0.5, ease: "power3.out" }
+      );
+      
+      gsap.fromTo(studioRef.current.querySelector(".options-panel"), 
+        { opacity: 0, x: 60 },
+        { opacity: 1, x: 0, duration: 0.8, delay: 0.7, ease: "power3.out" }
+      );
+    }
+    
     return () => {
       frontFabricRef.current?.dispose();
       backFabricRef.current?.dispose();
@@ -201,13 +231,13 @@ const Studio = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div ref={studioRef} className="min-h-screen bg-background">
       <Navbar />
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
 
       <div className="container mx-auto px-4 pt-24 pb-12">
         <motion.h1
-          className="font-display font-black text-3xl md:text-4xl text-center mb-8 text-foreground"
+          className="studio-title font-display font-black text-3xl md:text-4xl text-center mb-8 text-foreground text-left"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -217,7 +247,7 @@ const Studio = () => {
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           {/* Toolbar */}
           <motion.div
-            className="glass-panel rounded-2xl p-4 flex lg:flex-col gap-2 flex-wrap lg:w-auto w-full"
+            className="toolbar glass-panel rounded-2xl p-4 flex lg:flex-col gap-2 flex-wrap lg:w-auto w-full"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
@@ -237,46 +267,46 @@ const Studio = () => {
 
           {/* Canvas Area */}
           <motion.div
-            className="flex-1 flex flex-col items-center"
+            className="canvas-area flex-1 flex flex-col items-center"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3 }}
           >
-            {/* Front/Back Toggle */}
-            <div className="flex gap-2 mb-4">
-              {(["front", "back"] as Side[]).map((side) => (
-                <button
-                  key={side}
-                  onClick={() => setActiveSide(side)}
-                  className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
-                    activeSide === side
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground hover:bg-muted"
-                  }`}
-                >
-                  {side === "back" && <FlipHorizontal2 className="w-3.5 h-3.5" />}
-                  {side.charAt(0).toUpperCase() + side.slice(1)} Side
-                </button>
-              ))}
-            </div>
-
             <div className="relative">
               {/* T-shirt background image */}
               <img
                 src={product.colors[selectedColorIdx].image}
                 alt={product.name}
-                className={`w-[500px] h-[600px] object-contain pointer-events-none select-none transition-transform duration-500 ${activeSide === "back" ? "scale-x-[-1]" : ""}`}
+                className={`w-[600px] h-[700px] object-contain pointer-events-none select-none transition-transform duration-500 ${activeSide === "back" ? "scale-x-[-1]" : ""}`}
+                style={{ marginTop: '-40px' }}
               />
               {/* Canvas overlay */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="mt-[-20px]" style={{ width: 220, height: 260 }}>
+                <div className="relative" style={{ width: 300, height: 360, marginTop: '-120px' }}>
+                  {/* Front/Back Toggle Buttons inside canvas area */}
+                  <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
+                    {(["front", "back"] as Side[]).map((side) => (
+                      <button
+                        key={side}
+                        onClick={() => setActiveSide(side)}
+                        className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                          activeSide === side
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-secondary-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {side === "back" && <FlipHorizontal2 className="w-3 h-3" />}
+                        {side.charAt(0).toUpperCase() + side.slice(1)}
+                      </button>
+                    ))}
+                  </div>
                   {/* Front canvas */}
                   <canvas
                     ref={frontCanvasRef}
                     className="border border-dashed border-accent/30 rounded-lg"
                     style={{
-                      width: 220,
-                      height: 260,
+                      width: 300,
+                      height: 360,
                       transform: `scale(${zoom})`,
                       transformOrigin: "center center",
                       display: activeSide === "front" ? "block" : "none",
@@ -287,8 +317,8 @@ const Studio = () => {
                     ref={backCanvasRef}
                     className="border border-dashed border-accent/30 rounded-lg"
                     style={{
-                      width: 220,
-                      height: 260,
+                      width: 300,
+                      height: 360,
                       transform: `scale(${zoom})`,
                       transformOrigin: "center center",
                       display: activeSide === "back" ? "block" : "none",
@@ -301,7 +331,7 @@ const Studio = () => {
 
           {/* Options Panel */}
           <motion.div
-            className="glass-panel rounded-2xl p-6 w-full lg:w-72 space-y-6"
+            className="options-panel glass-panel rounded-2xl p-6 w-full lg:w-72 space-y-6"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4 }}
